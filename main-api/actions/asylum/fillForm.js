@@ -9,6 +9,10 @@ export default async function fillForm(prisma, req, res) {
       code: code,
     },
   })
+
+  if (!user) {
+    return res.status(400).json({ error: 'Invalid code' });
+  }
   const userEmail = user ? user.emailAddress : null
 
   try {

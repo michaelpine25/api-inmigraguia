@@ -17,12 +17,13 @@ const siteUrl = process.env.SITE_URL
 const deployUrl = process.env.DEPLOY_URL
 const localUrl = process.env.LOCAL_URL
 const app = express()
-const port = 3000
+const port = process.env.PORT
+const host = process.env.HOST
 app.use(express.json())
 
 const corsOptions = {
     origin: [localUrl, siteUrl, deployUrl],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }
 
@@ -44,6 +45,6 @@ app.get('/api/v1/client/:clientId', (req, res) => getClientById(prisma, req, res
 // Stripe routes
 app.post('/api/v1/update-card', (req, res) => updateCard(stripe, prisma, req, res))
 
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`)
+app.listen(port, host, () => {
+  console.log(`Server is running at ${host}:${port}`)
 })
