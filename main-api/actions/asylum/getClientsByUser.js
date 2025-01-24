@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import { Prisma } from '@prisma/client'
 
 export default async function getClientsByUser (prisma, req, res)  {
     const { userId } = req.params
@@ -12,11 +13,46 @@ export default async function getClientsByUser (prisma, req, res)  {
             return res.status(401).json({ message: 'Unauthorized: Invalid token' })
         }
 
-        const clients = await prisma.client.findMany({
-            where: { preparerId: parseInt(userId, 10) }, 
-            orderBy: { createdAt: 'desc' }, 
-            take: 30, 
-        })
+        const { search } = req.query;
+
+        let clients;
+        if (search) {
+            const searchTerms = search.trim().toLowerCase().split(/\s+/);
+
+            let query;
+            if (searchTerms.length === 2) {
+                query = Prisma.sql`
+                    SELECT * FROM \`client\`
+                    WHERE \`preparerId\` = ${parseInt(userId, 10)}
+                    AND (
+                        (LOWER(JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.applicant.firstName'))) LIKE ${'%' + searchTerms[0] + '%'} 
+                        AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.applicant.lastName'))) LIKE ${'%' + searchTerms[1] + '%'})
+                        OR 
+                        (LOWER(JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.applicant.firstName'))) LIKE ${'%' + searchTerms[1] + '%'} 
+                        AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.applicant.lastName'))) LIKE ${'%' + searchTerms[0] + '%'})
+                    )
+                    LIMIT 30
+                `;
+            } else {
+                query = Prisma.sql`
+                    SELECT * FROM \`client\`
+                    WHERE \`preparerId\` = ${parseInt(userId, 10)}
+                    AND (
+                        LOWER(JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.applicant.firstName'))) LIKE ${'%' + searchTerms[0] + '%'} OR
+                        LOWER(JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.applicant.lastName'))) LIKE ${'%' + searchTerms[0] + '%'}
+                    )
+                    LIMIT 30
+                `;
+            }
+
+            clients = await prisma.$queryRaw(query);
+        } else {
+            clients = await prisma.client.findMany({
+                where: { preparerId: parseInt(userId, 10) },
+                orderBy: { createdAt: 'desc' },
+                take: 30,
+            });
+        }
 
         const serializedClients = clients.map(client => ({
             ...client,
